@@ -96,6 +96,8 @@ const VENTANA_MS = 10 * 60_000;
 
 export function controlarIntentos(ip: string) {
   const ahora = Date.now();
+  // Las claves por email permiten llenar el Map con emails inventados: se podan las vencidas.
+  if (intentos.size > 5_000) for (const [k, v] of intentos) if (ahora - v.desde >= VENTANA_MS) intentos.delete(k);
   const i = intentos.get(ip);
   if (i && ahora - i.desde < VENTANA_MS && i.n >= MAX_INTENTOS) throw new ErrorApi(429, "Demasiados intentos. Espera unos minutos.");
   if (!i || ahora - i.desde >= VENTANA_MS) intentos.set(ip, { n: 0, desde: ahora });
@@ -127,17 +129,23 @@ export async function verificarPadelReserve(email: string, password: string): Pr
 }
 
 async function verificarLyria(email: string, password: string): Promise<Omit<SesionStaff, "exp"> | null> {
-  const [u] = await consultar<{ id: string; email: string; full_name: string; password_hash: string; user_role: string; tenant_role: string | null }>(
+  // Como Lyria: solo cuentan las membresías aceptadas. Si hay emails que solo
+  // difieren en mayúsculas, gana el que coincide exacto.
+  const [u] = await consultar<{ id: string; email: string; full_name: string; password_hash: string | null; user_role: string; tenant_role: string | null }>(
     `select u.id, u.email, u.full_name, u.password_hash, u.role as user_role, tm.role as tenant_role
        from users u
-       left join tenant_members tm on tm.user_id = u.id and tm.tenant_id = $2
+       left join tenant_members tm on tm.user_id = u.id and tm.tenant_id = $2 and tm.accepted_at is not null
       where lower(u.email) = lower($1) and u.is_active
+      order by (u.email = $1) desc, u.id
       limit 1`,
     [email, tenantId()],
   );
-  const ok = await bcrypt.compare(password, u?.password_hash ?? HASH_FALSO);
-  if (!u || !ok) return null;
+  const ok = await bcrypt.compare(password, u?.password_hash || HASH_FALSO);
+  if (!u?.password_hash || !ok) return null;
   const esStaff = u.user_role === "super_admin" || ROLES_TENANT_STAFF.includes(u.tenant_role ?? "") || emailsStaff().includes(u.email.toLowerCase());
+  // Usuarios de otros tenants reciben el mismo 401 que una contraseña errónea:
+  // este login no debe servir para comprobar contraseñas de todo Lyria.
+  if (!esStaff && !u.tenant_role) return null;
   if (!esStaff) throw new ErrorApi(403, "Tu usuario no tiene permisos de staff en La Marina.");
   return { sub: u.id, nombre: u.full_name || u.email, metodo: "PADELRESERVE" };
 }
@@ -162,6 +170,11 @@ async function verificarSupabase(email: string, password: string): Promise<Omit<
   return { sub: user.id, nombre: user.user_metadata?.full_name ?? user.user_metadata?.nombre ?? user.email, metodo: "PADELRESERVE" };
 }
 
+/**
+ * IP del cliente. Traefik (Dokploy) agrega la IP real al FINAL de
+ * X-Forwarded-For; lo de la izquierda lo puede inventar el cliente, así que
+ * se usa el último salto.
+ */
 export function ipDe(req: Request) {
-  return req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("x-real-ip") || "local";
+  return req.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() || req.headers.get("x-real-ip") || "local";
 }

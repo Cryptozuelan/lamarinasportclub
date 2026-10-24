@@ -72,6 +72,8 @@ docker exec -i $DB psql -U appceso -d sales_agent -v ON_ERROR_STOP=1 \
 rm /tmp/americanos.sql
 ```
 
+Re-running the migration later (schema changes) is safe: **omit `-v app_password`** and the existing password is left untouched. Pass it only to set or rotate the password, and then update `DATABASE_URL` in Dokploy too. Never pass the password as an ssh positional argument (`ssh host 'cmd "$1"' -- pw` drops it); run psql on the server or pipe through stdin.
+
 Verify:
 
 ```bash
@@ -98,7 +100,8 @@ STAFF_PIN=<4-8 digits, not 1234>
 STAFF_EMAILS=
 ```
 
-   - `STAFF_SECRET` must be ≥ 16 chars. Changing it logs out all staff.
+   - `STAFF_SECRET` must be ≥ 16 chars and is effectively mandatory (without it the session key is derived from `DATABASE_URL`, so a DB password rotation would log everyone out). Changing it logs out all staff.
+   - `APP_URL` is baked in at **build** time for prerendered pages; the code default is already `https://lamarina-americanos.appceso.cloud`. For another domain, change the default in `app/layout.tsx` (or pass it as a Dokploy build arg).
    - Omit `STAFF_PIN` to allow only PadelReserve logins (stronger).
    - URL-encode the password if it ever contains `@ : / #` (hex doesn't).
 
@@ -110,11 +113,12 @@ STAFF_EMAILS=
 
 | # | Check | Expected |
 | --- | --- | --- |
+| 0 | `curl -s https://lamarina-americanos.appceso.cloud/api/health` | `{"ok":true}` (healthcheck, no DB) |
 | 1 | `curl -s https://lamarina-americanos.appceso.cloud/api/americanos \| jq .modo` | `"POSTGRES"` |
 | 2 | `curl -s .../api/staff/me \| jq .metodos` | `padelreserve: true`, `pin` per `STAFF_PIN` |
 | 3 | Login as a La Marina `admin` / `staff_admin` | 200, badge "En línea", can create events |
-| 4 | Login as a `member` | 403 "no tiene permisos de staff" |
-| 5 | Wrong password ×6 | 401 ×5, then 429 |
+| 4 | Login as a La Marina `member` / user of another tenant | 403 / 401 (other tenants get the same 401 as a wrong password) |
+| 5 | Wrong password ×6 (same IP, or same email from different IPs) | 401 ×5, then 429 |
 | 6 | Create an event | Row in `americanos_eventos` with `tenant_id = la_marina_sport_club` |
 | 7 | Open it on another phone, no session | Read-only, updates within ~8 s |
 | 8 | `/evento/:id/tv` + scan QR | QR opens the new domain |

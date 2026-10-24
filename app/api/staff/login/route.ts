@@ -14,6 +14,9 @@ export const POST = manejar(async (req: Request) => {
   const ip = ipDe(req);
   controlarIntentos(ip);
   const body = (await leerJson(req)) as { pin?: unknown; email?: unknown; password?: unknown } | null;
+  // Además de por IP, se limita por cuenta: rotar IPs no da intentos infinitos contra un email.
+  const claves = typeof body?.email === "string" ? [ip, `email:${body.email.trim().toLowerCase()}`] : [ip];
+  claves.forEach(controlarIntentos);
 
   let sesion: Parameters<typeof crearToken>[0] | null = null;
   if (typeof body?.pin === "string" || typeof body?.pin === "number") {
@@ -25,10 +28,10 @@ export const POST = manejar(async (req: Request) => {
   }
 
   if (!sesion) {
-    registrarFallo(ip);
+    claves.forEach(registrarFallo);
     throw new ErrorApi(401, "PIN o credenciales incorrectas.");
   }
-  limpiarIntentos(ip);
+  claves.forEach(limpiarIntentos);
   const { token, maxAge } = crearToken(sesion);
   const res = NextResponse.json({ staff: { nombre: sesion.nombre, metodo: sesion.metodo } });
   res.cookies.set(COOKIE, token, { httpOnly: true, secure: process.env.NODE_ENV === "production", sameSite: "lax", path: "/", maxAge });
