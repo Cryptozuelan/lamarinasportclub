@@ -1,6 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
+  // Imagen Docker mínima (.next/standalone) para Dokploy.
+  output: "standalone",
   reactStrictMode: true,
   async headers() {
     return [

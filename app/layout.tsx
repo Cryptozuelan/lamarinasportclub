@@ -7,7 +7,7 @@ const inter = Inter({ subsets: ["latin"], variable: "--font-inter", display: "sw
 const display = Space_Grotesk({ subsets: ["latin"], variable: "--font-display", weight: ["500", "600", "700"], display: "swap" });
 
 export const metadata: Metadata = {
-  metadataBase: new URL("https://lamarinasportclub.vercel.app"),
+  metadataBase: new URL(process.env.APP_URL ?? "https://lamarina-americanos.appceso.cloud"),
   title: { default: "Americanos · La Marina Sport Club", template: "%s · La Marina" },
   description: "Americanos y torneos de pádel en vivo: cuadros, marcadores y ranking en tiempo real. PadelReserve × La Marina Sport Club.",
   applicationName: "La Marina Americanos",

@@ -9,14 +9,18 @@
  *   SUPABASE_SERVICE_ROLE_KEY. Juan: implementa aquí el mapeo a las tablas de
  *   PadelReserve (ver docs/BACKEND.md). Por defecto usa una tabla JSONB
  *   `americanos_eventos` vía PostgREST, que funciona sin dependencias extra.
+ * - MODO POSTGRES: se activa con `DATABASE_URL` y tiene prioridad sobre
+ *   Supabase. Usa las tablas de db/postgres.sql, separadas por
+ *   `tenant_id` (`TENANT_ID`, por defecto la_marina_sport_club).
  */
 import "server-only";
 import mock from "@/data/mockData.json";
 import { CLUB_POR_DEFECTO } from "@/lib/horarios";
+import { consultar, postgresActivo, tenantId } from "@/lib/server/db";
 import type { ConfigClub, EventoAmericano } from "@/types/americano";
 
 export interface AmericanosRepository {
-  modo: "DEMO" | "SUPABASE";
+  modo: "DEMO" | "SUPABASE" | "POSTGRES";
   listar(): Promise<EventoAmericano[]>;
   obtener(id: string): Promise<EventoAmericano | null>;
   guardar(evento: EventoAmericano): Promise<EventoAmericano>;
@@ -113,7 +117,48 @@ function supabaseRepository(url: string, key: string): AmericanosRepository {
   };
 }
 
+/* ---------- POSTGRES (Dokploy / Lyria) ---------- */
+
+/** Tablas de db/postgres.sql, siempre filtradas por tenant. */
+const postgresRepository: AmericanosRepository = {
+  modo: "POSTGRES",
+  async listar() {
+    const filas = await consultar<{ data: EventoAmericano }>("select data from americanos_eventos where tenant_id = $1 order by actualizado_en desc", [tenantId()]);
+    return filas.map((f) => f.data);
+  },
+  async obtener(id) {
+    const filas = await consultar<{ data: EventoAmericano }>("select data from americanos_eventos where tenant_id = $1 and id = $2", [tenantId(), id]);
+    return filas[0]?.data ?? null;
+  },
+  async guardar(evento) {
+    await consultar(
+      `insert into americanos_eventos (tenant_id, id, data, estado, actualizado_en) values ($1, $2, $3, $4, $5)
+       on conflict (tenant_id, id) do update set data = excluded.data, estado = excluded.estado, actualizado_en = excluded.actualizado_en`,
+      [tenantId(), evento.id, evento, evento.estado, evento.actualizadoEn],
+    );
+    return evento;
+  },
+  async eliminar(id) {
+    await consultar("delete from americanos_eventos where tenant_id = $1 and id = $2", [tenantId(), id]);
+    return true;
+  },
+  async obtenerClub() {
+    const filas = await consultar<{ data: ConfigClub }>("select data from americanos_club_config where tenant_id = $1", [tenantId()]);
+    return filas[0]?.data ?? CLUB_POR_DEFECTO;
+  },
+  async guardarClub(club) {
+    await consultar(
+      `insert into americanos_club_config (tenant_id, data, actualizado_en) values ($1, $2, now())
+       on conflict (tenant_id) do update set data = excluded.data, actualizado_en = now()`,
+      [tenantId(), club],
+    );
+    return club;
+  },
+};
+
+/** DATABASE_URL → Postgres; si no, Supabase; si no, DEMO. */
 export function getRepository(): AmericanosRepository {
+  if (postgresActivo()) return postgresRepository;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   return url && key ? supabaseRepository(url, key) : demoRepository;

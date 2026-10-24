@@ -35,7 +35,7 @@ export function manejar<A extends unknown[]>(fn: (...args: A) => Promise<Respons
       if (err instanceof ErrorApi) return NextResponse.json({ error: err.message, detalles: err.detalles }, { status: err.status });
       const msg = (err as Error)?.message ?? "Error desconocido";
       console.error("[api/americanos]", msg);
-      const esBackend = msg.startsWith("Supabase");
+      const esBackend = msg.startsWith("Supabase") || msg.startsWith("Postgres");
       return NextResponse.json({ error: esBackend ? "No se pudo conectar con la base de datos." : "Error interno.", detalle: msg }, { status: esBackend ? 502 : 500 });
     }
   };

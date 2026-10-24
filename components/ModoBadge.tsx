@@ -7,7 +7,7 @@ export function ModoBadge() {
   const modo = useAmericanos((s) => s.modo);
   const pendientes = usePendientes();
   if (!modo) return null;
-  if (modo === "SUPABASE")
+  if (modo === "SUPABASE" || modo === "POSTGRES")
     return (
       <span className="chip text-neon" title="Conectado a PadelReserve">
         <Cloud className="size-3" /> En línea
@@ -20,7 +20,7 @@ export function ModoBadge() {
       </span>
     );
   return (
-    <span className="chip text-cielo" title="Datos de ejemplo (mockData.json). Configura Supabase para producción.">
+    <span className="chip text-cielo" title="Datos de ejemplo (mockData.json). Configura DATABASE_URL para producción.">
       <FlaskConical className="size-3" /> Demo
     </span>
   );

@@ -260,6 +260,6 @@ export interface EventoAmericano {
 export type GuardarEventoPayload = { evento: EventoAmericano };
 
 export interface ApiListaRespuesta {
-  modo: "DEMO" | "SUPABASE";
+  modo: "DEMO" | "SUPABASE" | "POSTGRES";
   eventos: EventoAmericano[];
 }
