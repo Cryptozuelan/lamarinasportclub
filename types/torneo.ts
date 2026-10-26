@@ -423,12 +423,12 @@ export interface MarcadorVivo {
 }
 
 export interface ApiTorneosRespuesta {
-  modo: "DEMO" | "SUPABASE";
+  modo: "DEMO" | "SUPABASE" | "POSTGRES";
   torneos: Torneo[];
 }
 
 export interface ApiMarcadoresRespuesta {
-  modo: "DEMO" | "SUPABASE";
+  modo: "DEMO" | "SUPABASE" | "POSTGRES";
   marcadores: MarcadorVivo[];
 }
 

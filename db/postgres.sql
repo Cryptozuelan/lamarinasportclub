@@ -31,6 +31,56 @@ create table if not exists public.americanos_club_config (
   actualizado_en timestamptz not null default now()
 );
 
+-- Tournaments (types/torneo.ts). Same JSONB pattern as americanos_eventos.
+create table if not exists public.americanos_torneos (
+  tenant_id      text        not null references public.tenants (id) on delete cascade,
+  id             text        not null,
+  club_id        text        not null default 'la-marina',
+  data           jsonb       not null,                 -- full Torneo
+  estado         text        not null default 'INSCRIPCION',
+  actualizado_en timestamptz not null default now(),
+  primary key (tenant_id, id)
+);
+create index if not exists americanos_torneos_tenant_actualizado_idx
+  on public.americanos_torneos (tenant_id, actualizado_en desc);
+
+-- Point-by-point live score per match (MarcadorVivo). id = match id.
+create table if not exists public.americanos_torneos_marcadores (
+  tenant_id      text        not null,
+  id             text        not null,
+  torneo_id      text        not null,
+  data           jsonb       not null,
+  actualizado_en timestamptz not null default now(),
+  primary key (tenant_id, id),
+  foreign key (tenant_id, torneo_id) references public.americanos_torneos (tenant_id, id) on delete cascade
+);
+create index if not exists americanos_torneos_marcadores_torneo_idx
+  on public.americanos_torneos_marcadores (tenant_id, torneo_id);
+
+-- Loose per-event data (evento_id = tournament or americano id): club referee
+-- roster (id 'arbitros:club', tipo 'arbitros'), pair photos (tipo 'foto') and
+-- player photos (tipo 'foto-jugador', base64 JPEG ~40-80 KB).
+create table if not exists public.americanos_extras (
+  tenant_id      text        not null references public.tenants (id) on delete cascade,
+  id             text        not null,
+  evento_id      text        not null,
+  tipo           text        not null,
+  data           jsonb       not null,
+  actualizado_en timestamptz not null default now(),
+  primary key (tenant_id, id)
+);
+create index if not exists americanos_extras_evento_idx
+  on public.americanos_extras (tenant_id, evento_id, tipo);
+
+-- Current FVP ranking (types/ranking.ts): one row per tenant, id = 'fvp'.
+create table if not exists public.americanos_ranking_fvp (
+  tenant_id      text        not null references public.tenants (id) on delete cascade,
+  id             text        not null,
+  data           jsonb       not null,
+  actualizado_en timestamptz not null default now(),
+  primary key (tenant_id, id)
+);
+
 -- Least-privilege application role.
 do $$
 begin
@@ -56,7 +106,11 @@ alter role americanos_app with login connection limit 10;
 
 grant connect on database sales_agent to americanos_app;
 grant usage on schema public to americanos_app;
-grant select, insert, update, delete on public.americanos_eventos, public.americanos_club_config to americanos_app;
+grant select, insert, update, delete on
+  public.americanos_eventos, public.americanos_club_config,
+  public.americanos_torneos, public.americanos_torneos_marcadores,
+  public.americanos_extras, public.americanos_ranking_fvp
+  to americanos_app;
 
 -- Staff login: only the columns needed to verify a password and a tenant role.
 grant select (id, email, full_name, password_hash, role, is_active) on public.users to americanos_app;

@@ -4,7 +4,8 @@ Deploys the app on our Dokploy server (`76.13.24.31`) using the existing Lyria P
 
 - **URL:** `https://lamarina-americanos.appceso.cloud`
 - **Image:** `Dockerfile` (Next.js standalone, Node 22, ~245 MB, non-root)
-- **Data:** `americanos_eventos` + `americanos_club_config` in `sales_agent`, scoped by `tenant_id = la_marina_sport_club`
+- **Data:** `americanos_eventos`, `americanos_club_config`, `americanos_torneos`, `americanos_torneos_marcadores`, `americanos_extras` (referee roster, photos) and `americanos_ranking_fvp` in `sales_agent`, all scoped by `tenant_id = la_marina_sport_club`
+- **Upgrading an existing install:** re-run `db/postgres.sql` **without** `-v app_password` to add new tables; the password is left untouched
 
 ## Architecture
 
@@ -13,7 +14,7 @@ flowchart LR
   U[Players / Staff / TV] -->|HTTPS| T[Traefik + Let's Encrypt]
   T -->|lamarina-americanos.appceso.cloud| A[lamarina-americanos<br/>Next.js :3000]
   A -->|DATABASE_URL<br/>appceso-db-vx0gu1:5432<br/>role americanos_app| P[(appceso-db PG15<br/>sales_agent)]
-  P --- E[americanos_eventos<br/>americanos_club_config]
+  P --- E[americanos_eventos / club_config<br/>torneos / marcadores / extras / ranking_fvp]
   P --- L[users + tenant_members<br/>read-only columns, bcrypt]
   G[GitHub main] -->|auto-deploy| D[Dokploy Dockerfile build] --> A
 ```
@@ -143,7 +144,8 @@ APP_URL=https://<staging-host> STAFF_PIN=<pin> node tests/e2e/robustez.e2e.mjs
 - **DB rollback** (removes only this app's objects):
 
 ```sql
-drop table if exists public.americanos_eventos, public.americanos_club_config;
+drop table if exists public.americanos_torneos_marcadores, public.americanos_torneos, public.americanos_extras,
+  public.americanos_ranking_fvp, public.americanos_eventos, public.americanos_club_config;
 drop owned by americanos_app; drop role if exists americanos_app;
 ```
 

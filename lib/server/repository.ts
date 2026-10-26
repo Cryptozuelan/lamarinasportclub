@@ -170,7 +170,7 @@ export function getRepository(): AmericanosRepository {
 
 
 export interface TorneosRepository {
-  modo: "DEMO" | "SUPABASE";
+  modo: "DEMO" | "SUPABASE" | "POSTGRES";
   listar(): Promise<Torneo[]>;
   obtener(id: string): Promise<Torneo | null>;
   guardar(t: Torneo): Promise<Torneo>;
@@ -302,7 +302,75 @@ function supabaseTorneos(url: string, key: string): TorneosRepository {
   };
 }
 
+type FilaExtra = { id: string; evento_id: string; tipo: string; data: unknown; actualizado_en: Date };
+const aExtra = (f: FilaExtra): ExtraTorneo => ({ id: f.id, torneoId: f.evento_id, tipo: f.tipo, data: f.data ?? null, actualizadoEn: f.actualizado_en.toISOString() });
+
+/** Mismas tablas que supabase/schema.sql, con prefijo americanos_ y separadas por tenant (db/postgres.sql). */
+const postgresTorneos: TorneosRepository = {
+  modo: "POSTGRES",
+  async listar() {
+    const filas = await consultar<{ data: Torneo }>("select data from americanos_torneos where tenant_id = $1 order by actualizado_en desc", [tenantId()]);
+    return filas.map((f) => f.data);
+  },
+  async obtener(id) {
+    const filas = await consultar<{ data: Torneo }>("select data from americanos_torneos where tenant_id = $1 and id = $2", [tenantId(), id]);
+    return filas[0]?.data ?? null;
+  },
+  async guardar(t) {
+    await consultar(
+      `insert into americanos_torneos (tenant_id, id, club_id, data, estado, actualizado_en) values ($1, $2, $3, $4, $5, $6)
+       on conflict (tenant_id, id) do update set club_id = excluded.club_id, data = excluded.data, estado = excluded.estado, actualizado_en = excluded.actualizado_en`,
+      [tenantId(), t.id, t.clubId, t, t.estado, t.actualizadoEn],
+    );
+    return t;
+  },
+  async listarMarcadores(torneoId) {
+    const filas = torneoId
+      ? await consultar<{ data: MarcadorVivo }>("select data from americanos_torneos_marcadores where tenant_id = $1 and torneo_id = $2", [tenantId(), torneoId])
+      : await consultar<{ data: MarcadorVivo }>("select data from americanos_torneos_marcadores where tenant_id = $1", [tenantId()]);
+    return filas.map((f) => f.data);
+  },
+  async obtenerMarcador(id) {
+    const filas = await consultar<{ data: MarcadorVivo }>("select data from americanos_torneos_marcadores where tenant_id = $1 and id = $2", [tenantId(), id]);
+    return filas[0]?.data ?? null;
+  },
+  async guardarMarcador(m) {
+    await consultar(
+      `insert into americanos_torneos_marcadores (tenant_id, id, torneo_id, data, actualizado_en) values ($1, $2, $3, $4, $5)
+       on conflict (tenant_id, id) do update set torneo_id = excluded.torneo_id, data = excluded.data, actualizado_en = excluded.actualizado_en`,
+      [tenantId(), m.id, m.torneoId, m, m.actualizadoEn],
+    );
+    return m;
+  },
+  async listarExtras(torneoId, tipo) {
+    // Como en Supabase: sin `data` salvo el registro de árbitros (las fotos pesan).
+    const filas = await consultar<FilaExtra>(
+      `select id, evento_id, tipo, case when tipo = 'arbitros' then data end as data, actualizado_en
+         from americanos_extras where tenant_id = $1 and evento_id = $2 and tipo = $3`,
+      [tenantId(), torneoId, tipo],
+    );
+    return filas.map(aExtra);
+  },
+  async obtenerExtra(id) {
+    const filas = await consultar<FilaExtra>("select id, evento_id, tipo, data, actualizado_en from americanos_extras where tenant_id = $1 and id = $2", [tenantId(), id]);
+    return filas[0] ? aExtra(filas[0]) : null;
+  },
+  async guardarExtra(x) {
+    await consultar(
+      `insert into americanos_extras (tenant_id, id, evento_id, tipo, data, actualizado_en) values ($1, $2, $3, $4, $5, $6)
+       on conflict (tenant_id, id) do update set evento_id = excluded.evento_id, tipo = excluded.tipo, data = excluded.data, actualizado_en = excluded.actualizado_en`,
+      [tenantId(), x.id, x.torneoId, x.tipo, JSON.stringify(x.data), x.actualizadoEn],
+    );
+    return x;
+  },
+  async borrarExtra(id) {
+    await consultar("delete from americanos_extras where tenant_id = $1 and id = $2", [tenantId(), id]);
+  },
+};
+
+/** DATABASE_URL → Postgres; si no, Supabase; si no, DEMO. */
 export function getTorneosRepository(): TorneosRepository {
+  if (postgresActivo()) return postgresTorneos;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   return url && key ? supabaseTorneos(url, key) : demoTorneos;
@@ -311,7 +379,7 @@ export function getTorneosRepository(): TorneosRepository {
 /* ---------- RANKING FVP ---------- */
 
 export interface RankingRepository {
-  modo: "DEMO" | "SUPABASE";
+  modo: "DEMO" | "SUPABASE" | "POSTGRES";
   obtener(): Promise<RankingFvp | null>;
   guardar(r: RankingFvp): Promise<RankingFvp>;
 }
@@ -353,7 +421,26 @@ function supabaseRanking(url: string, key: string): RankingRepository {
   };
 }
 
+/** Una fila por tenant (id = 'fvp') en americanos_ranking_fvp. */
+const postgresRanking: RankingRepository = {
+  modo: "POSTGRES",
+  async obtener() {
+    const filas = await consultar<{ data: RankingFvp }>("select data from americanos_ranking_fvp where tenant_id = $1 and id = 'fvp'", [tenantId()]);
+    return filas[0]?.data ?? null;
+  },
+  async guardar(r) {
+    await consultar(
+      `insert into americanos_ranking_fvp (tenant_id, id, data, actualizado_en) values ($1, 'fvp', $2, $3)
+       on conflict (tenant_id, id) do update set data = excluded.data, actualizado_en = excluded.actualizado_en`,
+      [tenantId(), r, r.cargadoEn],
+    );
+    return r;
+  },
+};
+
+/** DATABASE_URL → Postgres; si no, Supabase; si no, DEMO. */
 export function getRankingRepository(): RankingRepository {
+  if (postgresActivo()) return postgresRanking;
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   return url && key ? supabaseRanking(url, key) : demoRanking;
