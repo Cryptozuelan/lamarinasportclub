@@ -6,6 +6,9 @@ import { motion } from "framer-motion";
 import { ArrowLeft, AtSign, Copy, MapPin, MessageCircle, Plus, Save, Sun, Trash2, Warehouse } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Logo } from "@/components/Logo";
+import { ArbitrosClub } from "@/components/ArbitrosClub";
+import { DatosPrueba } from "@/components/DatosPrueba";
+import { ClavesTorneos } from "@/components/torneo/ClavesTorneos";
 import { StaffGate } from "@/components/StaffGate";
 import { Stepper } from "@/components/ui/Stepper";
 import { toast } from "@/components/ui/Toaster";
@@ -27,6 +30,7 @@ function Club() {
   const hidratado = useAmericanos((s) => s.hidratado);
   const guardarClub = useAmericanos((s) => s.guardarClub);
   const [borrador, setBorrador] = useState<ConfigClub>(club);
+  const [demo, setDemo] = useState(0);
 
   useEffect(() => {
     if (hidratado) setBorrador(club);
@@ -172,6 +176,12 @@ function Club() {
           <input className="w-full bg-transparent py-3 outline-none placeholder:text-white/30" placeholder="Dirección" value={borrador.contacto.direccion ?? ""} onChange={(e) => setContacto({ direccion: e.target.value })} />
         </label>
       </div>
+
+      <ClavesTorneos />
+
+      <ArbitrosClub key={demo} />
+
+      <DatosPrueba onCambio={() => setDemo((n) => n + 1)} />
 
       <footer className="fixed inset-x-0 bottom-0 z-40 border-t border-white/5 bg-fondo/85 pb-[max(1rem,env(safe-area-inset-bottom))] pt-4 backdrop-blur-xl">
         <div className="mx-auto max-w-2xl px-4 sm:px-6">

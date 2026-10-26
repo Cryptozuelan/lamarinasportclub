@@ -3,8 +3,8 @@
  * - Estáticos (_next/static, iconos, fuentes): cache-first.
  * - /api: siempre red (el cliente guarda su propio estado en localStorage).
  */
-const VERSION = "lm-v2";
-const SHELL = ["/", "/setup", "/offline", "/manifest.json", "/icons/icon-192.png", "/icons/icon-512.png"];
+const VERSION = "lm-v4";
+const SHELL = ["/", "/americanos", "/torneos", "/setup", "/offline", "/manual", "/manifest.json", "/icons/icon-192.png", "/icons/icon-512.png"];
 
 self.addEventListener("install", (e) => {
   e.waitUntil(caches.open(VERSION).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()));

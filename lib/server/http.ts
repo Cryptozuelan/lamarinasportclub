@@ -14,11 +14,12 @@ export class ErrorApi extends Error {
   }
 }
 
-export async function leerJson(req: Request): Promise<unknown> {
+export async function leerJson(req: Request, max = MAX_BYTES): Promise<unknown> {
+  const limite = `El cuerpo supera ${Math.round(max / 1_000_000)} MB.`;
   const largo = Number(req.headers.get("content-length") ?? 0);
-  if (largo > MAX_BYTES) throw new ErrorApi(413, "El cuerpo supera 1 MB.");
+  if (largo > max) throw new ErrorApi(413, limite);
   const texto = await req.text();
-  if (texto.length > MAX_BYTES) throw new ErrorApi(413, "El cuerpo supera 1 MB.");
+  if (texto.length > max) throw new ErrorApi(413, limite);
   try {
     return JSON.parse(texto);
   } catch {

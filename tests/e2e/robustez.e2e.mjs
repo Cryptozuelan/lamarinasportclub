@@ -1,5 +1,5 @@
 // Prueba en navegador de usos indebidos y fallos (dos celulares, sin internet, recargas, etc.).
-// Requiere la app corriendo en modo DEMO recién iniciada:  npm run build && npm start
+// Requiere la app corriendo en modo DEMO (carga sola los datos de prueba):  npm run build && npm start
 // (STAFF_PIN si se cambió el PIN de demo 1234)
 // y Playwright:  npx -y playwright@1.56 install chromium  (o PW_CHROMIUM=/ruta/a/chromium)
 //   node tests/e2e/robustez.e2e.mjs
@@ -15,16 +15,23 @@ const vp = { viewport: { width: 390, height: 844 } };
 const A = await b.newContext(vp), B = await b.newContext(vp);
 const PIN = process.env.STAFF_PIN ?? "1234";
 
+// La app arranca vacía: el staff carga los datos de prueba (Ajustes → Datos de prueba).
+const S = await b.newContext(vp);
+await S.request.post(`${U}/api/staff/login`, { data: { pin: PIN } });
+if (!(await S.request.post(`${U}/api/demo`, { data: { accion: "cargar" } })).ok()) throw new Error("No se pudieron cargar los datos de prueba");
+const ev = (await (await S.request.get(`${U}/api/americanos`)).json()).eventos.filter((e) => e.id.endsWith("evt_demo_mixto") && !e.eliminado).map((e) => e.id).sort().at(-1);
+await S.close();
+
 // 0) Espectador (jugador que escanea el QR): ve todo, no puede editar
 {
   const E = await b.newContext(vp);
   const pe = await nuevo(E);
-  await pe.goto(`${U}/evento/evt_demo_mixto`, { waitUntil: "networkidle" }); await pe.waitForTimeout(1200);
+  await pe.goto(`${U}/evento/${ev}`, { waitUntil: "networkidle" }); await pe.waitForTimeout(1200);
   ok(await pe.locator("text=Modo espectador").count() > 0, "espectador: ve 'Modo espectador'");
   ok(await pe.locator("text=Cargar marcador").count() === 0, "espectador: no ve botones de carga");
   await pe.locator("text=Pista 2").first().click(); await pe.waitForTimeout(400);
   ok(await pe.locator("text=Guardar resultado").count() === 0, "espectador: tocar una pista no abre el marcador");
-  const st = await pe.evaluate(async () => (await fetch("/api/americanos/evt_demo_mixto", { method: "DELETE" })).status);
+  const st = await pe.evaluate(async (id) => (await fetch(`/api/americanos/${id}`, { method: "DELETE" })).status, ev);
   ok(st === 401, `espectador: la API rechaza cambios (${st})`);
   await pe.goto(`${U}/setup`, { waitUntil: "networkidle" }); await pe.waitForTimeout(800);
   ok(await pe.locator("text=Acceso staff").count() > 0, "espectador: crear evento pide acceso staff");
@@ -40,7 +47,6 @@ for (const ctx of [A, B]) {
   if (!r.ok()) throw new Error("No se pudo ingresar como staff: " + (await r.text()));
 }
 const pa = await nuevo(A), pb = await nuevo(B);
-const ev = "evt_demo_mixto";
 await pa.goto(`${U}/evento/${ev}`, { waitUntil: "networkidle" });
 await pb.goto(`${U}/evento/${ev}`, { waitUntil: "networkidle" });
 await pa.waitForTimeout(1200); await pb.waitForTimeout(1200);

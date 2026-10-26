@@ -74,11 +74,6 @@ const PASOS = ["Categoría", "Formato", "Jugadores", "Pistas", "Listo"];
 const P_JUGADORES = 2;
 const P_PISTAS = 3;
 
-const NOMBRES_DEMO: Record<Genero, string[]> = {
-  F: ["Valentina", "Camila", "Lucía", "Sofía", "Martina", "Isabella", "Renata", "Paula", "Antonia", "Julieta", "Elena", "Mía", "Daniela", "Gabriela", "Carolina", "Andrea", "Mariana", "Fernanda", "Victoria", "Natalia", "Adriana", "Claudia", "Rosa", "Inés"],
-  M: ["Mateo", "Diego", "Tomás", "Joaquín", "Sebastián", "Andrés", "Nicolás", "Martín", "Lucas", "Felipe", "Bruno", "Emilio", "Gabriel", "Samuel", "Daniel", "Alejandro", "Ricardo", "Javier", "Manuel", "Rafael", "Gonzalo", "Ignacio", "Pablo", "Simón"],
-};
-
 const variantes = {
   entra: (dir: number) => ({ x: dir > 0 ? 60 : -60, opacity: 0 }),
   centro: { x: 0, opacity: 1 },
@@ -241,7 +236,7 @@ function Setup() {
 
   function volver() {
     if (paso > 0) ir(paso - 1);
-    else router.push("/");
+    else router.push("/americanos");
   }
 
   function elegirFormato(f: Formato) {
@@ -397,7 +392,7 @@ function Setup() {
                   <input
                     className="input"
                     maxLength={60}
-                    placeholder={`Ej. "Copa Aniversario" · si lo dejas vacío: ${categoriaLabel({ ...categoria, nombre: null })}`}
+                    placeholder={`Nombre del evento (opcional) · si lo dejas vacío: ${categoriaLabel({ ...categoria, nombre: null })}`}
                     value={nombreCategoria}
                     onChange={(e) => setNombreCategoria(e.target.value)}
                   />
@@ -486,13 +481,11 @@ function Setup() {
                 )}
                 <AccionesPlantel
                   hayAlguien={jugadores.length > 0}
-                  onDemo={() => (dupla ? demoParejas() : demoJugadores())}
                   onVaciar={() => {
                     if (!confirm(`¿Quitar a todos los ${unidadPl}?`)) return;
                     setJugadores([]);
                     setParejas([]);
                   }}
-                  etiqueta={dupla ? "Rellenar con duplas demo" : "Rellenar con jugadores demo"}
                 />
                 <div className="mt-5 flex flex-wrap items-center gap-2 text-sm">
                   {errorJugadores ? (
@@ -781,53 +774,6 @@ function Setup() {
   function nombrePar(p: Pareja, js: Jugador[]) {
     return p.nombre ?? p.jugadorIds.map((id) => js.find((j) => j.id === id)?.nombre).join(" / ");
   }
-
-  function demoJugadores() {
-    const nuevos: Jugador[] = [];
-    const usados = new Set(jugadores.map((j) => j.nombre));
-    const agregar = (g: Genero, cuantos: number) => {
-      for (let i = 0; i < cuantos; i++) {
-        const n = NOMBRES_DEMO[g].find((x) => !usados.has(x)) ?? `${g === "F" ? "Jugadora" : "Jugador"} ${jugadores.length + nuevos.length + 1}`;
-        usados.add(n);
-        nuevos.push(crearJugador(n, g, nivelDemo(nivelJugadores, suma, nuevos.length)));
-      }
-    };
-    if (mixto) {
-      agregar("F", Math.max(2, 4 - nF));
-      agregar("M", Math.max(2, 4 - nH));
-    } else agregar(generoFijo ?? "M", Math.max(4, 8 - jugadores.length));
-    setJugadores((js) => [...js, ...nuevos]);
-    toast(`${nuevos.length} jugadores de ejemplo agregados`, "info");
-  }
-
-  function demoParejas() {
-    const faltan = Math.max(2, 6 - parejas.length);
-    const gA: Genero = generoFijo ?? "M";
-    const gB: Genero = generoFijo ?? "F";
-    const usados = new Set(jugadores.map((j) => j.nombre));
-    const libres = (g: Genero) => NOMBRES_DEMO[g].filter((n) => !usados.has(n));
-    const la = libres(gA);
-    const lb = gA === gB ? la.slice(faltan) : libres(gB);
-    const nuevosJ: Jugador[] = [];
-    const nuevasP: Pareja[] = [];
-    for (let i = 0; i < faltan; i++) {
-      const ja = crearJugador(la[i] ?? `Jugador ${i * 2 + 1}`, gA, nivelDemo(nivelJugadores, suma, i * 2));
-      const jb = crearJugador(lb[i] ?? `Jugador ${i * 2 + 2}`, gB, nivelDemo(nivelJugadores, suma, i * 2 + 1));
-      nuevosJ.push(ja, jb);
-      nuevasP.push({ id: nuevoId("par_"), jugadorIds: [ja.id, jb.id], nombre: `${ja.nombre} / ${jb.nombre}` });
-    }
-    setJugadores((js) => [...js, ...nuevosJ]);
-    setParejas((ps) => [...ps, ...nuevasP]);
-    toast(`${faltan} duplas de ejemplo agregadas`, "info");
-  }
-}
-
-/** En Suma, los jugadores demo alternan dos niveles que juntos dan exactamente la suma (ej. 5ta + 4ta = 9). */
-function nivelDemo(base: Nivel, suma: number | null, i: number): Nivel {
-  if (!suma) return base;
-  const a = Math.ceil(suma / 2);
-  const n = Math.min(7, Math.max(1, i % 2 === 0 ? a : suma - a));
-  return NIVELES.find((x) => NUMERO_NIVEL[x] === n) ?? base;
 }
 
 /* ---------- piezas del wizard ---------- */
@@ -1029,12 +975,10 @@ function EditorJugadores({
   );
 }
 
-function AccionesPlantel({ hayAlguien, onDemo, onVaciar, etiqueta }: { hayAlguien: boolean; onDemo: () => void; onVaciar: () => void; etiqueta: string }) {
+function AccionesPlantel({ hayAlguien, onVaciar }: { hayAlguien: boolean; onVaciar: () => void }) {
+  if (!hayAlguien) return null;
   return (
     <div className="mt-4 flex flex-wrap gap-2">
-      <button className="btn-ghost !py-2 text-xs" onClick={onDemo}>
-        <Dices className="size-3.5" /> {etiqueta}
-      </button>
       {hayAlguien && (
         <button className="btn-ghost !py-2 text-xs text-coral" onClick={onVaciar}>
           <Trash2 className="size-3.5" /> Vaciar

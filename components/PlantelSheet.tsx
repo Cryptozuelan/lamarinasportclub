@@ -2,9 +2,10 @@
 
 import clsx from "clsx";
 import { AnimatePresence, motion } from "framer-motion";
-import { Mars, RotateCcw, UserMinus, UserPlus, Venus, X } from "lucide-react";
+import { Camera, Mars, RotateCcw, UserMinus, UserPlus, Venus, X } from "lucide-react";
 import { useState } from "react";
 import { Avatar } from "@/components/Avatar";
+import { TomarFoto } from "@/components/Foto";
 import { toast } from "@/components/ui/Toaster";
 import {
   activosEnEvento,
@@ -17,6 +18,7 @@ import {
   retirarPareja,
 } from "@/lib/evento";
 import { vibrar } from "@/lib/feedback";
+import { subirFoto } from "@/lib/fotos";
 import { partidosPorRonda } from "@/lib/rotation";
 import { nivelParaSuma } from "@/lib/categories";
 import type { EventoAmericano, Genero, Jugador } from "@/types/americano";
@@ -132,9 +134,10 @@ export function PlantelSheet({
                 ? evento.parejas.map((p) => (
                     <li key={p.id} className={clsx("glass flex items-center gap-3 rounded-2xl px-3 py-2", p.retirada && "opacity-45")}>
                       <span className="flex -space-x-2">
-                        {p.jugadorIds.map((id) => (
-                          <Avatar key={id} nombre={porId.get(id)?.nombre ?? "?"} size={30} />
-                        ))}
+                        {p.jugadorIds.map((id) => {
+                          const j = porId.get(id);
+                          return j ? <FotoJugador key={id} evento={evento} j={j} onCambio={onCambio} /> : <Avatar key={id} nombre="?" size={30} />;
+                        })}
                       </span>
                       <span className="flex-1 truncate text-sm font-medium">{p.nombre}</span>
                       {p.retirada ? (
@@ -157,7 +160,7 @@ export function PlantelSheet({
                   ))
                 : evento.jugadores.map((j) => (
                     <li key={j.id} className={clsx("glass flex items-center gap-3 rounded-2xl px-3 py-2", j.retirado && "opacity-45")}>
-                      <Avatar nombre={`${j.nombre} ${j.apellido ?? ""}`} fotoUrl={j.fotoUrl} size={30} />
+                      <FotoJugador evento={evento} j={j} onCambio={onCambio} />
                       <span className="flex-1 truncate text-sm font-medium">
                         {j.nombre} {j.apellido}
                       </span>
@@ -190,5 +193,27 @@ export function PlantelSheet({
         </>
       )}
     </AnimatePresence>
+  );
+}
+
+/** Toca la cara del jugador para tomarle la foto (sale en el cuadro, el ranking y la TV). */
+function FotoJugador({ evento, j, onCambio }: { evento: EventoAmericano; j: Jugador; onCambio: (fn: (e: EventoAmericano) => EventoAmericano, mensaje: string) => void }) {
+  return (
+    <TomarFoto
+      className="relative rounded-full"
+      etiqueta={`Foto de ${j.nombre}`}
+      onFoto={async (img) => {
+        const r = await subirFoto(evento.id, "jugador", j.id, img);
+        if (!r.url) return toast(r.error!, "error");
+        onCambio((e) => ({ ...e, jugadores: e.jugadores.map((x) => (x.id === j.id ? { ...x, fotoUrl: r.url } : x)) }), `Foto de ${j.nombre} lista`);
+      }}
+    >
+      <Avatar nombre={`${j.nombre} ${j.apellido ?? ""}`} fotoUrl={j.fotoUrl} size={30} />
+      {!j.fotoUrl && (
+        <span className="absolute -bottom-1 -right-1 flex size-4 items-center justify-center rounded-full bg-lima text-marino-2">
+          <Camera className="size-2.5" />
+        </span>
+      )}
+    </TomarFoto>
   );
 }

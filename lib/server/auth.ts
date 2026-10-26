@@ -178,3 +178,106 @@ async function verificarSupabase(email: string, password: string): Promise<Omit<
 export function ipDe(req: Request) {
   return req.headers.get("x-forwarded-for")?.split(",").at(-1)?.trim() || req.headers.get("x-real-ip") || "local";
 }
+
+/* ---------- participantes de torneos ---------- */
+
+/**
+ * Clave de participantes por torneo. La cookie `lm_torneos` guarda, firmada, a qué
+ * torneos entró este dispositivo y hasta cuándo (el vencimiento de cada clave).
+ */
+export const COOKIE_TORNEOS = "lm_torneos";
+
+export type AccesosTorneo = Record<string, number>;
+
+export function leerAccesos(req: Request): AccesosTorneo {
+  const c = req.headers.get("cookie") ?? "";
+  const m = c.split(/;\s*/).find((x) => x.startsWith(`${COOKIE_TORNEOS}=`));
+  const token = m ? decodeURIComponent(m.slice(COOKIE_TORNEOS.length + 1)) : null;
+  if (!token) return {};
+  const [datos, firma] = token.split(".");
+  if (!datos || !firma) return {};
+  const esperada = Buffer.from(firmar(`t:${datos}`));
+  const recibida = Buffer.from(firma);
+  if (esperada.length !== recibida.length || !timingSafeEqual(esperada, recibida)) return {};
+  try {
+    const todos = JSON.parse(Buffer.from(datos, "base64url").toString()) as AccesosTorneo;
+    const ahora = Date.now() / 1000;
+    return Object.fromEntries(Object.entries(todos).filter(([, exp]) => exp > ahora));
+  } catch {
+    return {};
+  }
+}
+
+export function tokenAccesos(accesos: AccesosTorneo): { token: string; maxAge: number } {
+  const datos = b64(JSON.stringify(accesos));
+  const max = Math.max(60, ...Object.values(accesos).map((exp) => Math.ceil(exp - Date.now() / 1000)));
+  return { token: `${datos}.${firmar(`t:${datos}`)}`, maxAge: max };
+}
+
+/** Huella corta de la clave: al cambiarla, los accesos dados con la anterior dejan de valer. */
+export function huellaClave(clave: string): string {
+  return firmar(`k:${clave.trim().toUpperCase()}`).slice(0, 10);
+}
+
+export function claveCorrecta(recibida: string, esperada: string): boolean {
+  const a = Buffer.from(recibida.trim().toUpperCase());
+  const b = Buffer.from(esperada.trim().toUpperCase());
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+/* ---------- árbitros (anotadores) ---------- */
+
+/**
+ * Sesión de árbitro: rol aparte del staff, del club. Cada árbitro se registra una vez con el PIN
+ * de árbitros que el staff crea en Ajustes, su nombre y un código personal; la cookie guarda quién es
+ * y huellas del PIN y de su código: si el staff cambia el PIN, lo pausa, o el árbitro cambia su
+ * código, la sesión deja de valer.
+ */
+export const COOKIE_ARBITRO = "lm_arbitro";
+const DURACION_ARBITRO_S = 16 * 3600;
+
+export interface SesionArbitro {
+  /** Árbitro del plantel del club. */
+  arbitroId: string;
+  nombre: string;
+  /** Huella del PIN de árbitros del club. */
+  huella: string;
+  /** Huella de su código personal. */
+  hc: string;
+  exp: number;
+}
+
+/** Código personal del árbitro, guardado solo como HMAC ligado al ámbito (el club) y al árbitro. */
+export function hashCodigo(ambito: string, arbitroId: string, codigo: string): string {
+  return firmar(`r:${ambito}:${arbitroId}:${codigo.trim()}`);
+}
+
+export function codigoCorrecto(ambito: string, arbitroId: string, codigo: string, hash: string): boolean {
+  const a = Buffer.from(hashCodigo(ambito, arbitroId, codigo));
+  const b = Buffer.from(hash);
+  return a.length === b.length && timingSafeEqual(a, b);
+}
+
+export function crearTokenArbitro(s: Omit<SesionArbitro, "exp">): { token: string; maxAge: number } {
+  const exp = Math.floor(Date.now() / 1000) + DURACION_ARBITRO_S;
+  const datos = b64(JSON.stringify({ ...s, exp }));
+  return { token: `${datos}.${firmar(`a:${datos}`)}`, maxAge: Math.max(60, exp - Math.floor(Date.now() / 1000)) };
+}
+
+export function arbitroDe(req: Request): SesionArbitro | null {
+  const c = req.headers.get("cookie") ?? "";
+  const m = c.split(/;\s*/).find((x) => x.startsWith(`${COOKIE_ARBITRO}=`));
+  const token = m ? decodeURIComponent(m.slice(COOKIE_ARBITRO.length + 1)) : null;
+  if (!token) return null;
+  const [datos, firma] = token.split(".");
+  if (!datos || !firma) return null;
+  const esperada = Buffer.from(firmar(`a:${datos}`));
+  const recibida = Buffer.from(firma);
+  if (esperada.length !== recibida.length || !timingSafeEqual(esperada, recibida)) return null;
+  try {
+    const s = JSON.parse(Buffer.from(datos, "base64url").toString()) as SesionArbitro;
+    return s.arbitroId && s.exp > Date.now() / 1000 ? s : null;
+  } catch {
+    return null;
+  }
+}

@@ -2,58 +2,76 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
-import { Settings, Plus, Sparkles, Timer, Trophy, Tv } from "lucide-react";
-import { EventoCard } from "@/components/EventoCard";
+import { ArrowRight, BookOpen, Flag, Settings, Shuffle, Trophy } from "lucide-react";
 import { InstallButton } from "@/components/InstallButton";
 import { Logo } from "@/components/Logo";
-import { ModoBadge } from "@/components/ModoBadge";
 import { StaffChip } from "@/components/StaffGate";
 import { useAmericanos, useEsStaff, useListaEventos } from "@/lib/store";
+import { useListaTorneos } from "@/lib/torneosStore";
 
-const FEATURES = [
-  {
-    icon: Sparkles,
-    t: "Rotación inteligente",
-    d: "Nadie repite pareja y los descansos se reparten parejo.",
-  },
-  {
-    icon: Timer,
-    t: "Cuadro vivo",
-    d: "Cronómetro de ronda y marcador táctil por pista.",
-  },
-  {
-    icon: Trophy,
-    t: "Ranking al instante",
-    d: "La tabla se reordena con cada resultado.",
-  },
-  { icon: Tv, t: "Modo TV", d: "Pantalla gigante para la terraza y el bar." },
-];
-
+/** Inicio: tres puertas, Americanos, Torneos y Árbitros. */
 export default function Home() {
   const eventos = useListaEventos();
-  const hidratado = useAmericanos((s) => s.hidratado);
+  const torneos = useListaTorneos();
   const esStaff = useEsStaff();
   const setPedirLogin = useAmericanos((s) => s.setPedirLogin);
-  // Sin sesión, "Nuevo Americano" abre el acceso staff en lugar del setup.
-  const soloStaff = (e: React.MouseEvent) => {
-    if (esStaff) return;
-    e.preventDefault();
-    setPedirLogin(true);
-  };
-  const enVivo = eventos.filter((e) => e.estado !== "FINALIZADO");
-  const pasados = eventos.filter((e) => e.estado === "FINALIZADO");
+  const americanosVivos = eventos.filter((e) => e.estado === "EN_CURSO").length;
+  const torneosVivos = torneos.filter((t) => t.estado === "EN_JUEGO").length;
+  const torneosProximos = torneos.filter((t) => t.estado !== "FINALIZADO").length;
+  const partidosEnJuego = torneos.reduce((n, t) => n + t.categorias.reduce((m, c) => m + (c.cuadro?.partidos.filter((p) => p.estado === "EN_JUEGO").length ?? 0), 0), 0);
+
+  const puertas = [
+    {
+      href: "/americanos",
+      icon: Shuffle,
+      titulo: "Americanos",
+      lema: "Arma tu americano en 60 segundos.",
+      detalle: "Rotación de parejas, cuadro vivo, ranking y Modo TV.",
+      chip: americanosVivos ? `${americanosVivos} en vivo` : `${eventos.length} evento${eventos.length === 1 ? "" : "s"}`,
+      vivo: americanosVivos > 0,
+    },
+    {
+      href: "/torneos",
+      icon: Trophy,
+      titulo: "Torneos",
+      lema: "Del sorteo a la final, solo.",
+      detalle: "Todas las categorías, grupos y llaves automáticas, programación por días y marcador punto a punto.",
+      chip: torneosVivos ? `${torneosVivos} en juego` : `${torneosProximos} activo${torneosProximos === 1 ? "" : "s"}`,
+      vivo: torneosVivos > 0,
+    },
+    {
+      href: "/arbitro",
+      icon: Flag,
+      titulo: "Árbitros",
+      lema: "Anota el partido, punto a punto.",
+      detalle: "La tablet de cada pista: un toque por punto. Los televisores y las estadísticas de los atletas se actualizan al instante.",
+      chip: partidosEnJuego ? `${partidosEnJuego} partido${partidosEnJuego === 1 ? "" : "s"} en juego` : "Con PIN de árbitro",
+      vivo: partidosEnJuego > 0,
+    },
+  ];
 
   return (
     <main className="pb-24">
-      {/* Encabezado de marca, como en el sistema de reservas */}
       <div className="sobre-marca relative overflow-hidden bg-marca pb-16 pt-[max(0.75rem,env(safe-area-inset-top))]">
         <div className="pointer-events-none absolute -right-24 -top-32 size-80 rounded-full bg-marca-2/50 blur-3xl" />
         <div className="pointer-events-none absolute -left-24 bottom-0 size-64 rounded-full bg-neon/15 blur-3xl" />
         <header className="relative mx-auto flex max-w-5xl items-center justify-end gap-2 px-4 py-3 sm:px-6">
           <InstallButton />
-          <ModoBadge />
           <StaffChip />
-          <Link href="/club" onClick={soloStaff} className="btn-ghost !p-2.5" aria-label="Mi club" title="Mi club: pistas y horarios">
+          <Link href="/manual" className="btn-ghost !p-2.5" aria-label="Manual del staff" title="Manual del staff">
+            <BookOpen className="size-4" />
+          </Link>
+          <Link
+            href="/club"
+            onClick={(e) => {
+              if (esStaff) return;
+              e.preventDefault();
+              setPedirLogin(true);
+            }}
+            className="btn-ghost !p-2.5"
+            aria-label="Ajustes"
+            title="Ajustes del club"
+          >
             <Settings className="size-4" />
           </Link>
         </header>
@@ -69,97 +87,41 @@ export default function Home() {
 
       <div className="relative -mt-8 rounded-t-[2rem] bg-fondo">
         <div className="mx-auto max-w-5xl px-4 pt-6 sm:px-6">
-          <section className="glass relative overflow-hidden rounded-[2rem] p-6 sm:p-10">
-            <div className="pointer-events-none absolute -right-20 -top-20 size-60 rounded-full bg-marca-2/30 blur-3xl" />
-            <motion.p initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }} className="label relative !text-neon">
-              PadelReserve · Americanos & Torneos
-            </motion.p>
-            <motion.h1
-              initial={{ opacity: 0, y: 12 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.05 }}
-              className="relative max-w-xl font-display text-4xl font-bold leading-[1.05] tracking-tight sm:text-6xl"
-            >
-              Arma tu americano en <span className="text-marca">60 segundos</span>.
-            </motion.h1>
-            <motion.p initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.15 }} className="relative mt-4 max-w-md text-white/60">
-              Elige categoría, pistas y jugadores. Nosotros armamos las parejas, el cuadro y el ranking en vivo.
-            </motion.p>
-            <motion.div
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
-              className="relative mt-8 flex flex-wrap gap-3"
-            >
-              <Link href="/setup" onClick={soloStaff} className="btn-neon animate-pulse-neon text-base">
-                <Plus className="size-5" /> Nuevo Americano
-              </Link>
-              {enVivo[0] && (
-                <Link href={`/evento/${enVivo[0].id}/tv`} className="btn-ghost text-base">
-                  <Tv className="size-5" /> Abrir Modo TV
+          <p className="label !text-neon">PadelReserve · La Marina Sport Club</p>
+          <h1 className="font-display text-3xl font-bold tracking-tight sm:text-5xl">¿Qué jugamos hoy?</h1>
+
+          <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {puertas.map((p, i) => (
+              <motion.div key={p.href} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.08 + i * 0.07 }} className={i === 2 ? "sm:col-span-2 lg:col-span-1" : undefined}>
+                <Link
+                  href={p.href}
+                  className="glass group relative flex h-full min-h-56 flex-col overflow-hidden rounded-[2rem] p-6 transition hover:border-neon/40 active:scale-[0.99] sm:min-h-72 sm:p-8"
+                >
+                  <div className="pointer-events-none absolute -right-16 -top-16 size-56 rounded-full bg-marca-2/30 blur-3xl transition group-hover:bg-neon/20" />
+                  <div className="relative flex items-start justify-between">
+                    <span className="flex size-14 items-center justify-center rounded-2xl bg-lima text-marino-2 shadow-[0_10px_30px_-10px_rgba(207,243,91,0.8)] sm:size-16">
+                      <p.icon className="size-7 sm:size-8" />
+                    </span>
+                    <span className={p.vivo ? "chip border-neon/30 bg-neon/10 text-neon" : "chip"}>
+                      {p.vivo && (
+                        <span className="relative flex size-2">
+                          <span className="absolute inline-flex size-full animate-ping rounded-full bg-neon opacity-70" />
+                          <span className="relative inline-flex size-2 rounded-full bg-neon" />
+                        </span>
+                      )}
+                      {p.chip}
+                    </span>
+                  </div>
+                  <h2 className="relative mt-auto pt-8 font-display text-4xl font-bold tracking-tight sm:text-5xl">{p.titulo}</h2>
+                  <p className="relative mt-1 font-semibold text-neon">{p.lema}</p>
+                  <p className="relative mt-2 max-w-sm text-sm text-white/55">{p.detalle}</p>
+                  <span className="relative mt-5 flex items-center gap-2 text-sm font-semibold text-white/80 group-hover:text-neon">
+                    Entrar <ArrowRight className="size-4 transition group-hover:translate-x-1" />
+                  </span>
                 </Link>
-              )}
-            </motion.div>
-          </section>
-
-          <section className="mt-10">
-            <div className="mb-4 flex items-end justify-between">
-              <h2 className="font-display text-xl font-semibold">Eventos activos</h2>
-              <span className="text-xs text-white/40">{enVivo.length} evento(s)</span>
-            </div>
-            {!hidratado ? (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {[0, 1].map((i) => (
-                  <div key={i} className="glass h-40 animate-pulse rounded-3xl" />
-                ))}
-              </div>
-            ) : enVivo.length === 0 ? (
-              <Link
-                href="/setup"
-                onClick={soloStaff}
-                className="glass flex flex-col items-center gap-2 rounded-3xl border-dashed p-10 text-center text-white/60 hover:text-white"
-              >
-                <Plus className="size-8 text-neon" />
-                Aún no hay eventos. ¡Crea el primero!
-              </Link>
-            ) : (
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {enVivo.map((e, i) => (
-                  <EventoCard key={e.id} evento={e} index={i} />
-                ))}
-              </div>
-            )}
-          </section>
-
-          {pasados.length > 0 && (
-            <section className="mt-10">
-              <h2 className="mb-4 font-display text-xl font-semibold">Historial</h2>
-              <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                {pasados.map((e, i) => (
-                  <EventoCard key={e.id} evento={e} index={i} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          <section className="mt-12 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {FEATURES.map((f, i) => (
-              <motion.div
-                key={f.t}
-                initial={{ opacity: 0, y: 12 }}
-                whileInView={{ opacity: 1, y: 0 }}
-                viewport={{ once: true }}
-                transition={{ delay: i * 0.05 }}
-                className="glass rounded-2xl p-4"
-              >
-                <span className="flex size-9 items-center justify-center rounded-xl bg-lima text-marino-2">
-                  <f.icon className="size-5" />
-                </span>
-                <p className="mt-3 text-sm font-semibold">{f.t}</p>
-                <p className="mt-1 text-xs leading-relaxed text-white/50">{f.d}</p>
               </motion.div>
             ))}
-          </section>
+          </div>
         </div>
       </div>
     </main>

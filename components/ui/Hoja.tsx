@@ -16,6 +16,7 @@ export function Hoja({
   sub,
   children,
   pie,
+  ancho = "max-w-md",
 }: {
   abierta: boolean;
   onClose: () => void;
@@ -23,6 +24,8 @@ export function Hoja({
   sub?: React.ReactNode;
   children: React.ReactNode;
   pie?: React.ReactNode;
+  /** Ancho máximo en computadora (por defecto max-w-md). */
+  ancho?: string;
 }) {
   useEffect(() => {
     if (!abierta) return;
@@ -48,7 +51,7 @@ export function Hoja({
               role="dialog"
               aria-modal
               aria-label={titulo}
-              className="glass-strong pointer-events-auto max-h-[90dvh] w-full max-w-md overflow-y-auto rounded-t-[2rem] px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3 sm:rounded-[2rem] sm:pt-5"
+              className={`glass-strong pointer-events-auto max-h-[90dvh] w-full ${ancho} overflow-y-auto rounded-t-[2rem] px-5 pb-[max(1.25rem,env(safe-area-inset-bottom))] pt-3 sm:rounded-[2rem] sm:pt-5`}
               initial={{ y: 60, opacity: 0 }}
               animate={{ y: 0, opacity: 1 }}
               exit={{ y: 60, opacity: 0 }}

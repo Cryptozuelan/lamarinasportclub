@@ -6,7 +6,7 @@ Versión compartible (con comentarios): https://claude.ai/artifact/DLqeP7UWsT6SB
 
 La Marina Americanos es una app web instalable (PWA) para organizar americanos y torneos de pádel en La Marina Sport Club. Reemplaza la app de americanos de pago que usa hoy el club y forma parte del sistema PadelReserve.
 
-Ya funciona sola en modo DEMO, sin base de datos. Para producción, Juan solo tiene que conectar Supabase y definir unas variables de entorno (sección "Pasos para Juan").
+Ya funciona sola en modo DEMO, sin base de datos; arranca vacía y el staff carga ejemplos con **Ajustes → Datos de prueba**. Para producción, Juan solo tiene que conectar Supabase y definir unas variables de entorno (sección "Pasos para Juan").
 
 | Qué | Dónde |
 | --- | --- |
@@ -82,7 +82,7 @@ Al cargar el marcador, la app solo acepta resultados posibles con esas reglas y 
 - Si hay más duplas (o jugadores) que pistas, abajo aparece **En espera**: quién descansa esta ronda y en qué ronda vuelve a jugar. En el Modo TV también se muestra.
 - Toca una pista para **cargar marcador**. El modal no deja guardar un resultado imposible para el método elegido. Cada carga tiene **Deshacer**.
 - Con todas las pistas cargadas, toca **Siguiente** (o **Finalizar** en la última ronda). Se puede volver a una ronda anterior para corregir.
-- Botón **Jugadores** (o Parejas): retirar a alguien, sumar a quien llegó tarde o reincorporar. Solo se re-sortean las rondas que faltan.
+- Botón **Jugadores y fotos** (o Parejas y fotos): retirar a alguien, sumar a quien llegó tarde o reincorporar. Solo se re-sortean las rondas que faltan. Tocando la cara de un jugador se le toma una foto con la cámara; sale en el cuadro, el ranking y el Modo TV.
 - **Eliminar evento** pide confirmar y escribir ELIMINAR.
 
 ### Ranking y Modo TV
@@ -98,12 +98,53 @@ Escanean el QR del Modo TV, el QR grande que muestra el staff (botón QR en la b
 
 ### Mi club (staff)
 
-En el inicio, **Mi club** permite editar las pistas (nombre y si es techada), el horario de apertura y cierre por día, los minutos entre rondas y el contacto. Los eventos nuevos usan estos datos.
+En el inicio, **Ajustes** (el engranaje; solo staff, con el mismo PIN del staff) permite editar las pistas (nombre y si es techada), el horario de apertura y cierre por día, los minutos entre rondas y el contacto. Los eventos nuevos usan estos datos. También tiene las claves de los torneos, **Árbitros del club** (PIN de árbitros y plantel) y **Datos de prueba**.
+
+### Datos de prueba (para enseñar la app)
+
+La app arranca vacía: los campos solo dicen qué va en cada uno. En **Ajustes → Datos de prueba**, **Cargar datos de prueba** crea en un toque 3 americanos, un torneo de hoy con partidos en juego (clave `MARINA`) y 6 árbitros de ejemplo (código `1234`; si no había PIN de árbitros queda el `2468`). **Borrar datos de prueba** los quita y no toca lo que creó el club.
 
 ### Instalar la app
 
 - **Android / Chrome:** botón **Instalar** en la app, o menú ⋮ → Instalar app.
 - **iPhone:** en Safari, Compartir → Agregar a inicio.
+
+## Torneos: árbitros, sorteo y fotos
+
+Los torneos tienen su propio rol de **árbitro** (anotador), aparte del staff. El árbitro solo puede llamar, empezar y anotar partidos y fotografiar a las duplas; no abre cuadros, horarios ni ajustes.
+
+### Registro del árbitro (una sola vez, para todos los torneos)
+
+1. El staff abre **Ajustes** (el engranaje del inicio; pide el PIN del staff) → **Árbitros del club**. Ahí crea el **PIN de árbitros** (lo escribe, de 4 a 6 números, o toca **Uno al azar**), lo ve, lo cambia o cierra el registro. Solo el staff lo ve. **Enviar a los árbitros** lo comparte por WhatsApp con las instrucciones.
+2. El árbitro entra en Inicio → **Árbitros** y toca **Soy nuevo: registrarme**: nombre, apellido, teléfono y el PIN de árbitros. No hace falta que exista un torneo.
+3. Crea su **código personal** de 4 dígitos y lo repite. El código se guarda cifrado (HMAC) y nunca sale del servidor.
+4. Desde ahí, para entrar solo toca su nombre en la cuadrícula **¿Quién eres?** y escribe su código (entra solo al cuarto dígito). Si lo olvida, se registra otra vez con el mismo teléfono y elige uno nuevo.
+
+5. Con un torneo en curso entra directo a su pista; si hay varios, elige **¿Qué torneo vas a anotar?** (los que tienen turno suyo hoy aparecen primero).
+
+Así cada punto queda firmado con el nombre de quien lo anotó y no hay "yo no fui". Si dos árbitros se relevan en un partido, la página del partido muestra "Árbitros: A → B". Si el staff cambia el PIN, los árbitros solo vuelven a entrar con su nombre y su código.
+
+### Turnos y pistas
+
+En el torneo → **Árbitros** (staff) se ve el plantel del club con los turnos de cada uno en ese torneo, partidos y puntos anotados, un botón de WhatsApp, **Pausar** (lo deja fuera al instante) y borrar. Abajo está la grilla de **Turnos** por día, franja (mañana y tarde si el día pasa de 8 h) y pista: cada casilla se asigna con un selector y avisa si alguien quedaría en dos pistas a la vez. **Repartir automáticamente** reparte parejo, sin choques y con descanso entre franjas cuando sobran árbitros.
+
+En la tablet, el árbitro ve **Tu turno: Pista N · hh:mm–hh:mm** con cuántos partidos le tocan; la app abre su pista sola y solo muestra las pistas que le tocan hoy (con **Otra pista** para cubrir a un compañero). **Mis turnos** lista todo su torneo.
+
+### Antes de empezar el partido: asistente de 5 toques
+
+1. **Fotos**: una foto por dupla en la pista (opcional; **Saltar**). Sale junto a sus nombres en el anotador, la TV de la pista y la página del partido.
+2. **Sorteo**: se toca la **pelota de pádel**, rebota de un lado a otro y cae en la dupla ganadora (sorteo aleatorio del dispositivo). También se puede marcar a mano si se hizo con moneda.
+3. **Elección del ganador** (reglamento FIP): **Sacar**, **Restar** o **Elegir lado**. Si elige sacar o restar, la otra dupla elige el lado; si elige lado, la otra dupla decide si saca o resta. Es decir, quien gana y entrega el saque puede quedarse con el lado.
+4. **Lado**: un dibujo de la pista visto desde la silla del árbitro; se toca el lado.
+5. **Quién saca** en cada dupla, con botones grandes. **Empezar partido**.
+
+En el tablero, cada mitad de la pantalla corresponde al lado real de la pista y se cambia sola (con animación) en cada cambio de lado. El detalle Winner/Error ya no tiene barra de tiempo: queda abierto hasta que el árbitro elige o lo cierra con la X.
+
+**Cambio de lado (FIP Regla 2):** se cambia en los games impares (1-0, 2-1, 3-0, 3-2…). Tras el primer game del set se cambia directo, sin descanso; en los demás impares hay un máximo de 1:30; al terminar un set, 2:00; en el tie-break, cada 6 puntos con 20 s. En cada cambio la tablet del árbitro suena y muestra un aviso grande con un cronómetro circular; al llegar a cero suena una alarma y dice "¡Tiempo! A jugar". La TV de la pista muestra al público "CAMBIO DE LADO · 1:24" con la misma cuenta regresiva.
+
+### Fotos de jugadores en Torneos
+
+En **Inscritos** el staff puede tocar la cara de cada jugador para tomarle la foto, o el recuadro de cámara para la foto de la dupla. Las fotos se comprimen en el teléfono (menos de 400 KB) antes de subir.
 
 ## Tecnología y arquitectura
 
@@ -199,12 +240,13 @@ npm test                     # 55 tests de lógica
 
 ### 2. Crear las tablas en Supabase
 
-En el SQL Editor del proyecto de PadelReserve, corre `supabase/schema.sql`. Crea dos tablas con RLS activado:
+En el SQL Editor del proyecto de PadelReserve, corre `supabase/schema.sql`. Crea las tablas con RLS activado (las de torneos y marcadores se detallan en `docs/BACKEND.md`):
 
 | Tabla | Columnas | Contenido |
 | --- | --- | --- |
 | `americanos_eventos` | `id` text PK, `data` jsonb, `estado` text, `actualizado_en` timestamptz | Un `EventoAmericano` completo por fila |
 | `club_config` | `id` text PK (`la-marina`), `data` jsonb | `ConfigClub`: pistas, horarios, contacto |
+| `eventos_extras` | `id` text PK, `evento_id` text, `tipo` text, `data` jsonb, `actualizado_en` timestamptz | Plantel de árbitros del club, con su PIN (código de cada árbitro solo como HMAC), y fotos de duplas y jugadores |
 
 ### 3. Variables de entorno en Vercel
 
@@ -220,7 +262,7 @@ En Vercel → Settings → Environment Variables, y luego un Redeploy:
 | `STAFF_EMAILS` | Opcional | Correos con permiso de staff, separados por coma |
 | `SUPABASE_AMERICANOS_TABLE` / `SUPABASE_CLUB_TABLE` | Opcional | Si quieres otros nombres de tabla |
 
-Con las dos primeras, la app cambia sola de DEMO a SUPABASE y el badge pasa de "Demo" a "En línea".
+Con las dos primeras, la app cambia sola de DEMO a SUPABASE y aparece el badge "En línea" (en DEMO no se muestra ningún badge).
 
 ### 4. Dar acceso de staff a usuarios de PadelReserve
 
@@ -277,6 +319,8 @@ Si escribe en la base desde otro sistema, debe usar `fusionarEventos` de `lib/ev
 | POST | `/api/staff/login` | Público | `{ pin }` o `{ email, password }` → cookie |
 | GET | `/api/staff/me` | Público | `{ staff, metodos }` |
 | POST | `/api/staff/logout` | Público | Borra la cookie |
+| GET / POST | `/api/arbitros/pin` | Staff | PIN de árbitros del club: ver, fijar (`{ pin }`), uno al azar (`{}`) o cerrar (`{ pin: null }`) |
+| POST | `/api/demo` | Staff | `{ accion: "cargar" \| "borrar" }` datos de prueba |
 
 Errores, siempre en JSON: `400` JSON mal formado, `401` sin sesión, `403` usuario sin rol staff, `404` no existe, `413` cuerpo mayor a 1 MB, `422` validación fallida (con `detalles` en español), `429` demasiados intentos, `502` Supabase falló, `500` error inesperado.
 
@@ -299,7 +343,7 @@ Antes de entregar pasaron 55 tests de lógica (`npm test`), 67 pruebas en navega
 
 | Problema | Solución |
 | --- | --- |
-| El badge dice "Demo" en producción | Faltan `NEXT_PUBLIC_SUPABASE_URL` o `SUPABASE_SERVICE_ROLE_KEY`, o falta el Redeploy después de agregarlas |
+| No aparece el badge "En línea" en producción | Faltan `NEXT_PUBLIC_SUPABASE_URL` o `SUPABASE_SERVICE_ROLE_KEY`, o falta el Redeploy después de agregarlas |
 | "N por subir" en el badge | Hay cambios guardados en el celular esperando conexión o sesión. Se suben solos; si persiste, ingresar de nuevo como staff |
 | El PIN no funciona con Supabase | Con Supabase el PIN solo existe si `STAFF_PIN` está definido |
 | "Demasiados intentos" | Esperar 10 minutos o ingresar desde otra red |

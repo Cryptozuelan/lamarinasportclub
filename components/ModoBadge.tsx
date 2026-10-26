@@ -1,6 +1,6 @@
 "use client";
 
-import { Cloud, CloudOff, FlaskConical } from "lucide-react";
+import { Cloud, CloudOff } from "lucide-react";
 import { useAmericanos, usePendientes } from "@/lib/store";
 
 export function ModoBadge() {
@@ -19,9 +19,6 @@ export function ModoBadge() {
         <CloudOff className="size-3" /> Sin conexión{pendientes > 0 && ` · ${pendientes} por subir`}
       </span>
     );
-  return (
-    <span className="chip text-cielo" title="Datos de ejemplo (mockData.json). Configura DATABASE_URL para producción.">
-      <FlaskConical className="size-3" /> Demo
-    </span>
-  );
+  // En modo DEMO no se muestra nada: el público no necesita saberlo.
+  return null;
 }
