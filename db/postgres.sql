@@ -8,7 +8,8 @@
 -- When running over ssh, pipe this file through stdin; never pass the
 -- password as a positional argument (ssh flattens and drops it).
 --
--- Creates two tenant-scoped JSONB tables and a least-privilege role
+-- Creates six tenant-scoped JSONB tables (americanos, club config, tournaments,
+-- live scores, extras, FVP ranking) and a least-privilege role
 -- `americanos_app` that can only touch those tables and read the Lyria
 -- login columns it needs. Existing Lyria tables are not modified.
 

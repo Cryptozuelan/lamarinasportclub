@@ -320,7 +320,8 @@ const postgresTorneos: TorneosRepository = {
     await consultar(
       `insert into americanos_torneos (tenant_id, id, club_id, data, estado, actualizado_en) values ($1, $2, $3, $4, $5, $6)
        on conflict (tenant_id, id) do update set club_id = excluded.club_id, data = excluded.data, estado = excluded.estado, actualizado_en = excluded.actualizado_en`,
-      [tenantId(), t.id, t.clubId, t, t.estado, t.actualizadoEn],
+      // validarTorneo no exige clubId ni estado: mismos valores por defecto que las columnas (como en Supabase).
+      [tenantId(), t.id, t.clubId ?? "la-marina", t, t.estado ?? "INSCRIPCION", t.actualizadoEn],
     );
     return t;
   },
